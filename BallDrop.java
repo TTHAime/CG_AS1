@@ -6,7 +6,7 @@ import javax.swing.*;
 
 public class BallDrop extends JPanel implements Runnable{
     private static final int H = 600, W = 600;
-    private final double ballRadius = 50;
+    private final double ballRadius = 70;
 
     //Physics logic
     private double x = 80, y = 80;
@@ -93,8 +93,8 @@ public class BallDrop extends JPanel implements Runnable{
         g2.setColor(Color.BLACK);
         midpointCircle(g2, xc, yc, R);
         midpointCircle(g2, xc, yc, innerR);
-        g2.drawRect(xc-R, yc, R-innerR, (int) Math.round(R*0.028));
-        g2.drawRect(xc+innerR, yc, R-innerR, (int) Math.round(R*0.028));
+        g2.drawRect(xc-R, yc, R-innerR, (int) Math.round(R*0.01));
+        g2.drawRect(xc+innerR, yc, R-innerR, (int) Math.round(R*0.01));
     }
 
     //Physics Apply Method
