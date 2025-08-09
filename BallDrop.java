@@ -109,7 +109,7 @@ public class BallDrop extends JPanel implements Runnable{
         //Check if ball touch ground
         if(y + ballRadius > H){
             y = H - ballRadius;
-            if(Math.abs(vy) < 20) vy = 0;
+            if(Math.abs(vy) < 20) vy = 0; //Prevent ball spam bounce
             else vy = -vy * reboundForce;
             isBounced = true;
         }
