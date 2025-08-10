@@ -11,11 +11,10 @@ public class BallDrop extends JPanel implements Runnable{
     //Physics logic
     private double x = 80, y = 80;
     private final double gravity = 2000; // px/s^2 (200 pixels * 10(~9.8 -->gravity acceleration))
-    private final double reboundForce = 0.5;
+    private final double reboundForce = 0.8;
     private double vx = 150; //Velocity move ball in x axis
     private double vy = 0; //Velocity in y axis
-    private final double friction = 0.98;
-    private final double mu = 0.07; //Just Appoximate
+    private final double mu = 0.07; //Just Appoximate, use to calculate friction of ball when ball touch floor
     
     //bounce
     private boolean isBounced = false;
@@ -28,6 +27,7 @@ public class BallDrop extends JPanel implements Runnable{
     private Mode mode = Mode.BALL;
     private boolean isGlowStart = false;
     private double glowingStartTime = 0;
+    private final double glowingDuration = 7;
 
     public static void main(String[] args) {
         createGUI();
@@ -73,6 +73,13 @@ public class BallDrop extends JPanel implements Runnable{
         Graphics2D g2 = (Graphics2D) g;
         g2.setColor(Color.WHITE);
         g2.fillRect(0, 0, W, H);
+
+        if(mode == Mode.GLOWING){
+            double t = (System.currentTimeMillis() - glowingStartTime)/1000;
+            float p = (float) Math.max(0.0f,Math.min(1f, t/ Math.max(1e-6,glowingDuration)));
+            drawGlow(g2, x, y, p, (int) ballRadius);
+        }
+
         drawBall(g2, x, y, ballRadius);
     }
 
@@ -155,17 +162,73 @@ public class BallDrop extends JPanel implements Runnable{
                 glowingStartTime = currentTime;
             }
         }
+
+        if(mode == Mode.GLOWING){
+            double t = (currentTime - glowingStartTime) / 1000;
+            if(t >= glowingDuration) mode = Mode.KOMODO;
+        }
     }
 
     private void drawGlow(Graphics2D g2, double cx, double cy, float p, int baseRadius){
         //p is progress of glowing animation
-        float t = Math.max(0f, Math.min(1f, p)); //Normalize progress value into 0...1 range
+        float t = normalize(p); //Normalize progress value into 0...1 range
 
-        //Setting distance of glowing light
-        float diag = (float) Math.hypot(W,H); //Find the diagonal of screen, use for make glowing light cover entire screen
-        float r = diag * (0.60f + 0.50f * (1f - (float) Math.pow((1 - t), 3)));
+        float corePhase = normalize(t/0.35f);
+        float expanPhase = normalize((t - 0.35f)/0.65f);
 
-        //Setting color of glowing right
+        float rCore = baseRadius * (1f + 0.4f * eassingOutCubic(corePhase)); //Radius of glowing light in core phase
+        float aCore = lerp(0.2f, 1f, eassingOutCubic(corePhase)); //Alpha Core, core brightness
+
+        float diag = (float) Math.hypot(W, H); //Get screen diagonal, use for bright glowing entire screen
+
+        float rHalo = lerp(rCore, 1.10f * diag, eassingOutCubic(expanPhase)); //Halo radius
+        float aHalo = lerp(0.0f, 0.3f, eassingOutCubic(expanPhase)); // Alpha value of halo, Halo strength
+
+        Point2D c = new Point2D.Float((float)cx,(float)cy);
+
+        Paint oldPaint = g2.getPaint();
+        Composite oldCompo = g2.getComposite();
+
+        g2.setComposite(AlphaComposite.SrcOver);
+
+        { //Draw core light at the ball
+            float[] coreFraction = {0.0f, 0.20f, 1f};
+
+            Color[] coreColors = {
+                new Color(255,255,240, Math.round(255 * aCore)),
+                new Color(255, 255, 120, Math.round(255 * (0.8f * aCore))),
+                new Color(255,255,120, 0)
+            };
+            RadialGradientPaint rGradientPaint = new RadialGradientPaint(c, rCore, coreFraction, coreColors);
+            g2.setPaint(rGradientPaint);
+            g2.fill(new Ellipse2D.Float((float)(cx - rCore),(float)(cy-rCore),2*rCore,2*rCore));
+        }
+
+        { //Draw Expan light
+            float[] expanFraction = {0f, 1f};
+            Color[] haloColors = {
+                new Color(255, 220, 90, Math.round(255 * aHalo)),
+                new Color(255, 220, 90, 0)
+            };
+            RadialGradientPaint rGradientPaint = new RadialGradientPaint(c, rHalo, expanFraction, haloColors);
+            g2.setPaint(rGradientPaint);
+            g2.fillRect(0,0,W,H);
+        }
+
+        g2.setPaint(oldPaint);
+        g2.setComposite(oldCompo);
+    }
+
+    private float normalize(float x){
+        return (x < 0f)? 0f : (x >= 1f)? 1f : x;
+    }
+
+    private float lerp(float a, float b, float t){
+        return a + (normalize(t) * (b-a)); //Linear interpolation A + t * (B-A) where t is value between 0...1
+    }
+
+    private float eassingOutCubic(float t){
+        return 1f - ((float) Math.pow( 1 - normalize(t), 3));
     }
 
     //Implement midpoint circle
