@@ -27,7 +27,7 @@ public class BallDrop extends JPanel implements Runnable{
     private Mode mode = Mode.BALL;
     private boolean isGlowStart = false;
     private double glowingStartTime = 0;
-    private final double glowingDuration = 7;
+    private final double glowingDuration = 3;
 
     public static void main(String[] args) {
         createGUI();
@@ -53,7 +53,6 @@ public class BallDrop extends JPanel implements Runnable{
     @Override
     public void run() {
         double lastTime = System.currentTimeMillis();
-        double startTime = System.currentTimeMillis();
 
         double currentTime, elapsedTime;
 
