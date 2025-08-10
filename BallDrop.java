@@ -23,11 +23,15 @@ public class BallDrop extends JPanel implements Runnable{
 
     //Transform setting
     private final int tolPoint = 20; //tolerance point that ball will transform into animal
-    enum Mode {BALL, GLOWING, KOMODO};
+    enum Mode {BALL, GLOWING, KOMODO, GOLD_CUT};
     private Mode mode = Mode.BALL;
     private boolean isGlowStart = false;
     private double glowingStartTime = 0;
     private final double glowingDuration = 3;
+    private final double goldenCutsceneDuration = 1.5; //Approximately
+    private boolean isGoldenCutScene = false;
+    private double goldenCutsceneStartTime = 0;
+    private final double goldCunsceneOverlapTime = 0.25;
 
     public static void main(String[] args) {
         createGUI();
@@ -73,13 +77,28 @@ public class BallDrop extends JPanel implements Runnable{
         g2.setColor(Color.WHITE);
         g2.fillRect(0, 0, W, H);
 
+        
+        drawBall(g2, x, y, ballRadius);
         if(mode == Mode.GLOWING){
             double t = (System.currentTimeMillis() - glowingStartTime)/1000;
-            float p = (float) Math.max(0.0f,Math.min(1f, t/ Math.max(1e-6,glowingDuration)));
-            drawGlow(g2, x, y, p, (int) ballRadius);
+            float glowP = normalize((float) (t/glowingDuration)); //1e-6 : use for prevent divided by zero
+            float goldenP = normalize((float) (t - ((glowingDuration - goldCunsceneOverlapTime))/goldenCutsceneDuration)); //Use for draw a golden cutscene
+            drawGlow(g2, x, y, glowP, (int) ballRadius); //Make ball glowing golden light
+
+            if(goldenP > 0){//Check if time,that elapsed from start draw glowing light function
+                System.out.println(goldenP);
+                drawGoldenCutscene(g2, goldenP);
+            }
         }
 
-        drawBall(g2, x, y, ballRadius);
+        // System.out.println(isGoldenCutScene);
+        if(isGoldenCutScene){
+            Color color = new Color(255,220, 90);
+            g2.setComposite(AlphaComposite.SrcOver);
+            g2.setColor(color);
+            g2.fillRect(0, 0, W, H);
+        }
+
     }
 
     private void drawBall(Graphics2D g2, double cx, double cy, double r){
@@ -162,9 +181,22 @@ public class BallDrop extends JPanel implements Runnable{
             }
         }
 
+        //Change state to glowing light state
         if(mode == Mode.GLOWING){
             double t = (currentTime - glowingStartTime) / 1000;
-            if(t >= glowingDuration) mode = Mode.KOMODO;
+            if(t >= glowingDuration){
+                mode = Mode.GOLD_CUT;
+                goldenCutsceneStartTime = currentTime;
+                isGoldenCutScene = true;
+            }
+        }
+        
+        //Change mode/state when reach duration
+        if(mode == Mode.GOLD_CUT){
+            double t = (currentTime - goldenCutsceneStartTime)/1000;
+            if(t >= goldenCutsceneDuration){
+                mode = Mode.KOMODO;
+            }
         }
     }
 
@@ -218,8 +250,23 @@ public class BallDrop extends JPanel implements Runnable{
         g2.setComposite(oldCompo);
     }
 
+    private void drawGoldenCutscene(Graphics2D g2,float p)
+    {  
+        float alpha = eassingInCubic(p);
+        Color goldenColor = new Color(255,220,90);
+        g2.setColor(goldenColor);
+        g2.setComposite(AlphaComposite.SrcOver.derive(alpha));
+        g2.fillRect(0, 0, W, H);
+        g2.setComposite(AlphaComposite.SrcOver);
+    }
+
     private float normalize(float x){
         return (x < 0f)? 0f : (x >= 1f)? 1f : x;
+    }
+
+    private float eassingInCubic(float t){
+        t = normalize(t);
+        return (float) Math.pow(t, 3);
     }
 
     private float lerp(float a, float b, float t){
