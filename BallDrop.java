@@ -157,6 +157,17 @@ public class BallDrop extends JPanel implements Runnable{
         }
     }
 
+    private void drawGlow(Graphics2D g2, double cx, double cy, float p, int baseRadius){
+        //p is progress of glowing animation
+        float t = Math.max(0f, Math.min(1f, p)); //Normalize progress value into 0...1 range
+
+        //Setting distance of glowing light
+        float diag = (float) Math.hypot(W,H); //Find the diagonal of screen, use for make glowing light cover entire screen
+        float r = diag * (0.60f + 0.50f * (1f - (float) Math.pow((1 - t), 3)));
+
+        //Setting color of glowing right
+    }
+
     //Implement midpoint circle
     public void midpointCircle(Graphics2D g, int xc, int yc, int r)
     {
