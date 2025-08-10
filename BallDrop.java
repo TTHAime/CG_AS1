@@ -26,6 +26,8 @@ public class BallDrop extends JPanel implements Runnable{
     private final int tolPoint = 20; //tolerance point that ball will transform into animal
     enum Mode {BALL, GLOWING, KOMODO};
     private Mode mode = Mode.BALL;
+    private boolean isGlowStart = false;
+    private double glowingStartTime = 0;
 
     public static void main(String[] args) {
         createGUI();
@@ -61,7 +63,7 @@ public class BallDrop extends JPanel implements Runnable{
             lastTime = currentTime;
 
             //Physics Apply method
-            updatePhysics(elapsedTime);
+            updatePhysics(elapsedTime, currentTime);
             repaint();
         }
     }
@@ -98,7 +100,7 @@ public class BallDrop extends JPanel implements Runnable{
     }
 
     //Physics Apply Method
-    private void updatePhysics(double elapsedTime){
+    private void updatePhysics(double elapsedTime, double currentTime){
         prevY = y;
 
         //Make ball fall
@@ -142,6 +144,17 @@ public class BallDrop extends JPanel implements Runnable{
             vx = newVx;
         }
 
+        //Make the ball glowing
+        Double mid = H/2.0;
+        if(!isGlowStart && isBounced && mode == Mode.BALL){
+            boolean movingUp = vy < 0;
+            boolean isCrossMid = (prevY > mid + tolPoint) && (y <= mid + tolPoint);
+            if(movingUp && isCrossMid){
+                mode = Mode.GLOWING;
+                isGlowStart = true;
+                glowingStartTime = currentTime;
+            }
+        }
     }
 
     //Implement midpoint circle
