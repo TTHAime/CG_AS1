@@ -43,7 +43,7 @@ public class FPS_Coding extends JPanel implements Runnable {
     private Scene state = Scene.CODING; // ฉากเริ่มต้น
 
     // ระยะเวลาของแต่ละเฟส (วินาที)
-    private double codeDuration = 4.2;
+    private double codeDuration = 5.2;
     private double dimDuration = 2.0;
     private double approachDur = 0.85;
     private double impactDur = 0.45;
@@ -140,7 +140,6 @@ public class FPS_Coding extends JPanel implements Runnable {
     private double shakeAmp = 0.0;
     private final Random rng = new Random(23);
 
-    // (เวอร์ชันนี้ “ไม่ใช้” จุดชน/โดมยุบปุ่ม)
 
     /* ========================= Constructor ========================= */
 
@@ -316,7 +315,8 @@ public class FPS_Coding extends JPanel implements Runnable {
     }
 
     /*
-     * ========================= เหตุการณ์เริ่มชน (ตั้งค่าเริ่ม IMPACT)
+     * ========================= 
+     * เหตุการณ์เริ่มชน (ตั้งค่าเริ่ม IMPACT)
      * =========================
      */
 
@@ -325,7 +325,6 @@ public class FPS_Coding extends JPanel implements Runnable {
         double sign = rng.nextBoolean() ? 1 : -1;
         camRot = toRadians(1.0 * sign);
         rotVel = toRadians((220 + rng.nextInt(80)) * sign);
-        // (รอบนี้ไม่มีการตั้งค่าปุ่มยุบ)
     }
 
     /*
@@ -357,7 +356,7 @@ public class FPS_Coding extends JPanel implements Runnable {
         }
     }
 
-    // รูปทรงแถวคีย์บอร์ด (เยื้องแถวต่างกันนิดหน่อย)
+    // รูปทรงแถวคีย์บอร์ด 
     private double stagger(int r) {
         return switch (r) {
             case 0 -> 0.00;
@@ -378,12 +377,13 @@ public class FPS_Coding extends JPanel implements Runnable {
     }
 
     /*
-     * ========================= ลำดับการพิมพ์ (ใส่จังหวะตัวอย่าง)
+     * ========================= 
+     * ลำดับการพิมพ์ 
      * =========================
      */
 
     private void buildPattern() {
-        // ใส่จังหวะกดปุ่ม (จะวนซ้ำไปเรื่อย ๆ)
+        // ใส่จังหวะกดปุ่ม 
         addTap(1, 6, RIGHT, 0);
         addTap(1, 7, RIGHT, 1);
         addTap(1, 7, RIGHT, 1);
@@ -410,20 +410,17 @@ public class FPS_Coding extends JPanel implements Runnable {
      */
 
     private void initCodeLines() {
-        // สามารถแก้ข้อความ/จำนวนบรรทัด และสปีดย่อยได้ตามต้องการ
+        // ข้อความ/จำนวนบรรทัด บนหน้าจอ
         String[] lines = {
                 "public static void main(String[] args) {",
-                "  var app = new App(); app.run();",
+                "Hello World",
                 "}",
-                "for (int i = 0; i < n; i++) sum += a[i];",
-                "if (node != null) { dfs(node.left); dfs(node.right); }",
-                "List<Integer> out = new ArrayList<>();",
-                "double dt = (now - last) / 1e3;",
-                "g2.setRenderingHint(ANTIALIASING, VALUE_ANTIALIAS_ON);",
-                "AffineTransform old = g2.getTransform();",
-                "g2.translate(cx, cy); g2.rotate(theta);",
-                "requestFocusInWindow(); // key bindings",
-                "tapInterval = Math.max(0.05, tapInterval - 0.02);"
+                "Computer Graphic",
+                "ah hehe" ,
+                "CG",
+                "Bézier",
+                "Midpoint" ,
+                "Animation"
         };
 
         // วางแต่ละบรรทัดเป็นแนวนอนหลายแถวในหน้าจอ (ตำแหน่ง y คงที่)
@@ -569,7 +566,8 @@ public class FPS_Coding extends JPanel implements Runnable {
     }
 
     /*
-     * ========================= วาดคีย์บอร์ด (เรียบ ไม่ยุบ)
+     * ========================= 
+     * วาดคีย์บอร์ด (เรียบ ไม่ยุบ)
      * =========================
      */
 
@@ -600,7 +598,8 @@ public class FPS_Coding extends JPanel implements Runnable {
     }
 
     /*
-     * ========================= มือ/นิ้ว (โครงวาด + ฟิสิกส์นิ้ว)
+     * ========================= 
+     * มือ/นิ้ว (โครงวาด + ฟิสิกส์นิ้ว)
      * =========================
      */
 
@@ -658,7 +657,6 @@ public class FPS_Coding extends JPanel implements Runnable {
         }
 
         // อัปเดตสถานะนิ้ว (คายแรงกดตามเวลา)
-        // (ตัด “หายใจของมือ” → ไม่ขยับ anchor แบบ sin)
         void update(double dt, double tg) {
             for (Finger f : fs)
                 f.update(dt);
