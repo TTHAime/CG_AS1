@@ -23,15 +23,15 @@ public class BallDrop extends JPanel implements Runnable{
 
     //Transform setting
     private final int tolPoint = 20; //tolerance point that ball will transform into animal
-    enum Mode {BALL, GLOWING, KOMODO, GOLD_CUT};
+    enum Mode {BALL, GLOWING, KOMODO, FLASH};
     private Mode mode = Mode.BALL;
     private boolean isGlowStart = false;
     private double glowingStartTime = 0;
     private final double glowingDuration = 3;
-    private final double goldenCutsceneDuration = 1.5; //Approximately
-    private boolean isGoldenCutScene = false;
-    private double goldenCutsceneStartTime = 0;
-    private final double goldCunsceneOverlapTime = 0.25;
+    private final double flashDuration = 0.3; //Approximately
+    private boolean flashLocked = false;
+    private double flastStartTime = 0;
+    private final double flashOverlap = 0.25;
 
     public static void main(String[] args) {
         createGUI();
@@ -62,7 +62,7 @@ public class BallDrop extends JPanel implements Runnable{
 
         while (true) {
             currentTime = System.currentTimeMillis();
-            elapsedTime = (currentTime - lastTime)/1000;
+            elapsedTime = (currentTime - lastTime)/1000.0;
             lastTime = currentTime;
 
             //Physics Apply method
@@ -82,22 +82,21 @@ public class BallDrop extends JPanel implements Runnable{
         }
         
         if(mode == Mode.GLOWING){
-            double t = (System.currentTimeMillis() - glowingStartTime)/1000;
+            double t = (System.currentTimeMillis() - glowingStartTime)/1000.0;
+            double flashTime = (System.currentTimeMillis() - flastStartTime)/1000.0;
             float glowP = normalize((float) (t/glowingDuration)); //1e-6 : use for prevent divided by zero
-            float goldenP = normalize((float) (t - ((glowingDuration - goldCunsceneOverlapTime))/goldenCutsceneDuration)); //Use for draw a golden cutscene
+            float flashP = normalize((float) (flashTime / flashDuration));
             drawGlow(g2, x, y, glowP, (int) ballRadius); //Make ball glowing golden light
-
-            if(goldenP > 0){//Check if time,that elapsed from start draw glowing light function
-                drawGoldenCutscene(g2, goldenP);
+            if(flashLocked){
+                drawSolidWhite(g2);
+            }else if(flashP > 0f){
+                drawFlashCutscene(g2, x, y, flashP, (int) ballRadius);
+                if(flashP >= 1f){
+                    flashLocked = true;
+                    mode = Mode.KOMODO;
+                    System.out.println(mode);
+                }
             }
-        }
-
-        // System.out.println(isGoldenCutScene);
-        if(isGoldenCutScene){
-            Color color = new Color(255,220, 90);
-            g2.setComposite(AlphaComposite.SrcOver);
-            g2.setColor(color);
-            g2.fillRect(0, 0, W, H);
         }
 
     }
@@ -182,23 +181,12 @@ public class BallDrop extends JPanel implements Runnable{
             }
         }
 
-        //Change state to glowing light state
+        //Prepare for flash
         if(mode == Mode.GLOWING){
-            double t = (currentTime - glowingStartTime) / 1000;
-            if(t >= glowingDuration){
-                mode = Mode.GOLD_CUT;
-                goldenCutsceneStartTime = currentTime;
-                isGoldenCutScene = true;
-            }
+            flashLocked = false;
+            flastStartTime = glowingStartTime + (long)((glowingDuration - flashOverlap)*1000.0);
         }
         
-        //Change mode/state when reach duration
-        if(mode == Mode.GOLD_CUT){
-            double t = (currentTime - goldenCutsceneStartTime)/1000;
-            if(t >= goldenCutsceneDuration){
-                mode = Mode.KOMODO;
-            }
-        }
     }
 
     private void drawGlow(Graphics2D g2, double cx, double cy, float p, int baseRadius){
@@ -251,18 +239,53 @@ public class BallDrop extends JPanel implements Runnable{
         g2.setComposite(oldCompo);
     }
 
-    private void drawGoldenCutscene(Graphics2D g2,float p)
-    {  
-        float alpha = eassingInCubic(p);
-        Color goldenColor = new Color(255,220,90);
-        g2.setColor(goldenColor);
-        g2.setComposite(AlphaComposite.SrcOver.derive(alpha));
-        g2.fillRect(0, 0, W, H);
+    private void drawFlashCutscene(Graphics2D g2, double cx,double cy, float p,int baseRadius){
+        float t = normalize(p); //Normalze progress into 0...1
+
+        float diag = (float) Math.hypot(W, H); //Calculate screen diagonal, make flash can reach entire screen
+        float r = lerp(baseRadius * 1.4f, 1.05f * diag, eassingOutCubic(t));
+        float core = eassingOutCubic(t); //Ease in quadratic. bright in core of ball
+        float wash = 0.85f * eassingOutCubic(t); //Draw WHITE color with 85% of opacity
+
+        Point2D center = new Point2D.Float((float) cx, (float) cy);
+        float[] fraction = {0.0f, 0.1f, 1f};
+        Color[] colors = {
+            new Color(255,255,255, Math.round(255 * core)),
+            new Color(255,245,210, Math.round(255 * (0.5f * core))),
+            new Color(255,245,210, 0)  
+        };
+
+        RadialGradientPaint rGradientPaint = new RadialGradientPaint(center, r, fraction, colors);
+
+        Paint oldPaint = g2.getPaint(); //Save current paint
+        Composite oldCompo = g2.getComposite(); // Save current composite
+
         g2.setComposite(AlphaComposite.SrcOver);
+        g2.setPaint(rGradientPaint);
+        g2.fillRect(0, 0, W, H);
+
+
+        g2.setComposite(AlphaComposite.SrcOver.derive(wash));
+        g2.setColor(Color.WHITE);
+        g2.fillRect(0, 0, W, H);
+
+        g2.setPaint(oldPaint);//Restore paint
+        g2.setComposite(oldCompo);//Restore Composite
+    }
+
+    private void drawSolidWhite(Graphics2D g2){
+        g2.setComposite(AlphaComposite.SrcOver);
+        g2.setColor(Color.WHITE);
+        g2.fillRect(0, 0, W, H);
     }
 
     private float normalize(float x){
         return (x < 0f)? 0f : (x >= 1f)? 1f : x;
+    }
+
+    private float easingInQuad(float x){
+        x = normalize(x);
+        return (float) Math.pow(x, 2);
     }
 
     private float eassingInCubic(float t){
