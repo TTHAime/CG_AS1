@@ -77,8 +77,10 @@ public class BallDrop extends JPanel implements Runnable{
         g2.setColor(Color.WHITE);
         g2.fillRect(0, 0, W, H);
 
+        if(mode != Mode.KOMODO){
+            drawBall(g2, x, y, ballRadius);
+        }
         
-        drawBall(g2, x, y, ballRadius);
         if(mode == Mode.GLOWING){
             double t = (System.currentTimeMillis() - glowingStartTime)/1000;
             float glowP = normalize((float) (t/glowingDuration)); //1e-6 : use for prevent divided by zero
