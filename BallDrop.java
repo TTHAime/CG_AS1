@@ -162,7 +162,7 @@ public class BallDrop extends JPanel implements Runnable{
         //Make ball rolling friction
         onGround = (y + ballRadius >= H - 0.5)? true : false;
 
-        if(onGround){
+        if(onGround){ //Friction
             double ax = -mu * gravity * Math.signum(vx);
             double newVx = vx + ax * elapsedTime;
             if(vx != 0 && Math.signum(newVx) != Math.signum(vx)) vx = 0;
