@@ -86,7 +86,6 @@ public class BallDrop extends JPanel implements Runnable{
             drawGlow(g2, x, y, glowP, (int) ballRadius); //Make ball glowing golden light
 
             if(goldenP > 0){//Check if time,that elapsed from start draw glowing light function
-                System.out.println(goldenP);
                 drawGoldenCutscene(g2, goldenP);
             }
         }
