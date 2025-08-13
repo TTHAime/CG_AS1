@@ -636,6 +636,10 @@ public class FPS_Coding extends JPanel implements Runnable {
         void setAnchor(float x, float y) {
             anchor.setLocation(x, y);
         }
+        
+        void setAnchor(double x, double y) {
+            setAnchor((float) x, (float) y);
+        }
 
         // ปรับออฟเซ็ต “นิ้วเดี่ยว” (0=โป้ง..4=ก้อย)
         void setFingerOffset(int idx, float dx, float dy) {
@@ -655,6 +659,7 @@ public class FPS_Coding extends JPanel implements Runnable {
         void tapThumb(Point key) {
             fs[0].pressAt(key.x, key.y + 8);
         }
+
 
         // อัปเดตสถานะนิ้ว (คายแรงกดตามเวลา)
         void update(double dt, double tg) {
@@ -742,6 +747,10 @@ public class FPS_Coding extends JPanel implements Runnable {
             tx = x;
             ty = y;
             press = 1f;
+        }
+
+        void pressAt(double x, double y) {
+            pressAt((float) x, (float) y);
         }
 
         // คายแรงกดตามเวลา (ลด press)
