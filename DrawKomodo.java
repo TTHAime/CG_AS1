@@ -13,14 +13,26 @@ import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
 import java.awt.image.BufferedImage;
+import java.awt.Font;
 
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 
-public class DrawKomodo extends JPanel {
+public class DrawKomodo extends JPanel implements Runnable {
     public static final int W = 600, H = 600;
 
+    // === Animation (threaded game loop) ===
+    private volatile boolean running = true;
+    private double elapsedSec = 0.0; // time since start (seconds)
+
+    private Point2D eyeCenterPanel = new Point2D.Double(W * 0.58, H * 0.42);
+
+
+    private Point2D zoomTarget = null;
+    private double zoomOffsetX = 0, zoomOffsetY = 0;
+
+    // ======== Transform offsets (เดิมของรูป Komodo) ========
     public static final double tx0 = 4.10999996856333, ty0 = 25.4699990461196;
     public static final double tx1 = 23.7599984020607, ty1 = 37.1581143299928;
     public static final double tx2 = 25.8693748021331, ty2 = 37.8731247103201;
@@ -44,71 +56,128 @@ public class DrawKomodo extends JPanel {
     public static final AffineTransform at9 = AffineTransform.getTranslateInstance(tx9, ty9);
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(DrawKomodo::createGUI);
-    }
-
-    static public void createGUI() {
-        DrawKomodo panel = new DrawKomodo();
-        JFrame f = new JFrame("Komodo with Mountains & River");
-        f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        f.setContentPane(panel);
-        f.pack();
-        f.setLocationRelativeTo(null);
-        f.setVisible(true);
+        SwingUtilities.invokeLater(() -> {
+            DrawKomodo panel = new DrawKomodo();
+            JFrame f = new JFrame("Komodo • Threaded Animation (Eye-centered Zoom)");
+            f.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+            f.setContentPane(panel);
+            f.pack();
+            f.setLocationRelativeTo(null);
+            f.setVisible(true);
+            // start game loop thread
+            new Thread(panel, "AnimationLoop").start();
+        });
     }
 
     public DrawKomodo() {
-        this.setPreferredSize(new Dimension(W, H));
-        this.setBackground(Color.WHITE);
+        setPreferredSize(new Dimension(W, H));
+        setBackground(Color.WHITE); 
+    }
+
+    // === API ควบคุมจุดซูม  ===
+    public void setZoomTarget(double x, double y) {
+        this.zoomTarget = new Point2D.Double(x, y);
+    }
+
+    public void clearZoomTarget() {
+        this.zoomTarget = null;
+    }
+
+    public void setZoomOffset(double dx, double dy) {
+        this.zoomOffsetX = dx;
+        this.zoomOffsetY = dy;
+    }
+
+    @Override
+    public void run() {
+        double lastTime = System.currentTimeMillis();
+        while (running) {
+            double now = System.currentTimeMillis();
+            double dt = (now - lastTime) / 1000.0; // seconds
+            lastTime = now;
+
+            // update time
+            elapsedSec += dt;
+
+            // schedule a repaint on EDT
+            repaint();
+
+            try {
+                Thread.sleep(1);
+            } catch (InterruptedException ie) {
+                Thread.currentThread().interrupt();
+                break;
+            }
+        }
     }
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
+     
         BufferedImage buffer = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g2 = buffer.createGraphics();
 
-        // Antialiasing for smooth edges
+        // quality
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 
-        // Solid background
-        g2.setComposite(AlphaComposite.Src);
-        g2.setColor(Color.WHITE);
-        g2.fillRect(0, 0, W, H);
 
-        // --- draw scenery BEHIND the Komodo ---
-        drawBackground(g2);
+        drawSkyScreenSpace(g2);
 
-        // --- draw Komodo on top ---
-        // drawBlackKom(g2);
-        drawColorKom(g2);
+ 
+        double t = 0.0;
+        if (elapsedSec >= 2.0) {
+            t = Math.min(1.0, Math.max(0.0, (elapsedSec - 2.0) / 0.8)); // 0.8s เข้าเต็ม
+            t = t * t * (3 - 2 * t); // smoothstep
+        }
+        double zoom = 1.0 + 2.0 * t; // 1x -> 3x
+
+        Point2D target = (zoomTarget != null ? zoomTarget : eyeCenterPanel);
+        double cx = (target != null ? target.getX() + zoomOffsetX : W / 2.0);
+        double cy = (target != null ? target.getY() + zoomOffsetY : H / 2.0);
+
+        // ให้เฟรมแรก ๆ ค่อย ๆ ดึง "ตา" เข้าศูนย์กลาง
+        double fx = (1.0 - t) * (W / 2.0) + t * cx;
+        double fy = (1.0 - t) * (H / 2.0) + t * cy;
+
+        AffineTransform view = new AffineTransform();
+        view.translate(W / 2.0, H / 2.0);
+        view.scale(zoom, zoom);
+        view.translate(-fx, -fy);
+        g2.transform(view);
+
+        // 3) WORLD (อยู่ใน world space): ภูเขา แม่น้ำ คอมโด
+        drawBackgroundWorld(g2); // ภูเขา+แม่น้ำ
+        drawColorKom(g2); // คอมโด
+
+        // 4) popup '?'
+        if (elapsedSec >= 2.0 && eyeCenterPanel != null) {
+            double appear = Math.min(1.0, Math.max(0.0, (elapsedSec - 2.0) / 0.40));
+            drawQuestionMark(g2, eyeCenterPanel, appear, elapsedSec);
+        }
 
         g2.dispose();
         g.drawImage(buffer, 0, 0, null);
     }
 
-    private void drawBlackKom(Graphics2D g2) {
-        draw(g2, Color.BLACK, Color.WHITE);
-    }
-
-    private void drawColorKom(Graphics2D g2) {
-        draw(g2, new Color(75, 83, 32), new Color(218, 112, 214));
-    }
-
-    // ===== Background (Sky + Mountains + River) =====
-    private void drawBackground(Graphics2D g2) {
-        // Sky gradient
-        GradientPaint sky = new GradientPaint(0, 0, new Color(210, 230, 255),
+    // ---------- SKY ---------
+    private void drawSkyScreenSpace(Graphics2D g2) {
+        g2.setComposite(AlphaComposite.Src);
+        GradientPaint sky = new GradientPaint(
+                0, 0, new Color(210, 230, 255),
                 0, H, new Color(170, 210, 250));
         g2.setPaint(sky);
         g2.fillRect(0, 0, W, H);
+    }
 
-        // ---------- Mountain range 1 (far) ----------
-        int S = 600; // samples per segment
+    // ---------- ภูเขา+แม่น้ำ (world-space, โดนซูม) ----------
+    private void drawBackgroundWorld(Graphics2D g2) {
+        int S = 600;
+
+        // Mountain range 1 (far)
         Path2D m1 = new Path2D.Double();
-
         Point2D a0 = new Point2D.Double(-50, 420);
         Point2D a1 = new Point2D.Double(80, 300);
         Point2D a2 = new Point2D.Double(180, 360);
@@ -140,9 +209,8 @@ public class DrawKomodo extends JPanel {
         g2.setStroke(new BasicStroke(1.2f));
         g2.draw(m1);
 
-        // ---------- Mountain range 2 (near) ----------
+        // Mountain range 2 (near)
         Path2D m2 = new Path2D.Double();
-
         Point2D d0 = new Point2D.Double(-80, 480);
         Point2D d1 = new Point2D.Double(60, 380);
         Point2D d2 = new Point2D.Double(160, 440);
@@ -173,7 +241,7 @@ public class DrawKomodo extends JPanel {
         g2.setColor(new Color(80, 92, 104));
         g2.draw(m2);
 
-        // ---------- River (thick stroked Bézier) ----------
+        // River
         Point2D r0 = new Point2D.Double(-40, 520);
         Point2D r1 = new Point2D.Double(120, 560);
         Point2D r2 = new Point2D.Double(260, 520);
@@ -199,7 +267,7 @@ public class DrawKomodo extends JPanel {
         g2.draw(river);
     }
 
-    // ===== Cubic Bézier helper (4 control points, sample t in [0,1]) =====
+    // ===== Bézier helper =====
     private static Path2D cubicBezierPath(Point2D p0, Point2D p1, Point2D p2, Point2D p3, int samples) {
         Path2D.Double path = new Path2D.Double();
         path.moveTo(p0.getX(), p0.getY());
@@ -378,7 +446,8 @@ public class DrawKomodo extends JPanel {
         return p;
     }
 
-    public static void draw(Graphics2D g2, Color c, Color eyeColor) {
+    // ===== วาดคอมโด + เก็บตำแหน่ง "ตา" ไว้ใช้โฟกัสซูม =====
+    private void draw(Graphics2D g2, Color c, Color eyeColor) {
         Path2D s0 = (Path2D) buildShape0Path();
         Path2D s1 = (Path2D) buildShape1Path();
         Path2D s2 = (Path2D) buildShape2Path();
@@ -414,13 +483,13 @@ public class DrawKomodo extends JPanel {
 
         Rectangle2D groupRect = group.getBounds2D();
         double groupCX = groupRect.getCenterX();
-        double groupCY = groupRect.getCenterY(); // FIX: was getCenterX()
+        double groupCY = groupRect.getCenterY();
 
-        double panelCenterX = DrawKomodo.W / 2.0, panelCenterY = DrawKomodo.H / 2.0;
+        double panelCenterX = W / 2.0, panelCenterY = H / 2.0;
 
         AffineTransform centerPanel = new AffineTransform();
         centerPanel.translate(panelCenterX, panelCenterY);
-        centerPanel.scale(8.0, 8.0);
+        centerPanel.scale(8.0, 8.0); // ขนาดคอมโดรวม
         centerPanel.translate(-groupCX, -groupCY);
 
         Shape shape0 = centerPanel.createTransformedShape(shape0Local);
@@ -434,47 +503,40 @@ public class DrawKomodo extends JPanel {
         Shape shape8 = centerPanel.createTransformedShape(shape8Local);
         Shape shape9 = centerPanel.createTransformedShape(shape9Local);
 
-        g2.setStroke(new BasicStroke(0.8f)); // stroke in device space
+        g2.setStroke(new BasicStroke(0.8f));
+
         g2.setColor(c);
         g2.fill(shape0);
         g2.setColor(Color.BLACK);
         g2.draw(shape0);
-
         g2.setColor(c);
         g2.fill(shape1);
         g2.setColor(Color.BLACK);
         g2.draw(shape1);
-
         g2.setColor(c);
         g2.fill(shape2);
         g2.setColor(Color.BLACK);
         g2.draw(shape2);
-
         g2.setColor(c);
         g2.fill(shape3);
         g2.setColor(Color.BLACK);
         g2.draw(shape3);
-
         g2.setColor(c);
         g2.fill(shape4);
         g2.setColor(Color.BLACK);
         g2.draw(shape4);
-
         g2.setColor(c);
         g2.fill(shape5);
         g2.setColor(Color.BLACK);
         g2.draw(shape5);
-
         g2.setColor(c);
         g2.fill(shape6);
         g2.setColor(Color.BLACK);
         g2.draw(shape6);
-
         g2.setColor(c);
         g2.fill(shape7);
         g2.setColor(Color.BLACK);
         g2.draw(shape7);
-
         g2.setColor(c);
         g2.fill(shape8);
         g2.setColor(Color.BLACK);
@@ -484,16 +546,45 @@ public class DrawKomodo extends JPanel {
         g2.fill(shape9);
         g2.setColor(Color.BLACK);
         g2.draw(shape9);
+
+        // cache ตา (พิกัด panel-space หลัง centerPanel)
+        Rectangle2D eyeB = shape9.getBounds2D();
+        this.eyeCenterPanel = new Point2D.Double(eyeB.getCenterX(), eyeB.getCenterY());
     }
-}
 
-// (Not used here, but kept if you referenced it elsewhere)
-class Point {
-    public double x;
-    public double y;
+    private void drawBlackKom(Graphics2D g2) {
+        draw(g2, Color.BLACK, Color.WHITE);
+    }
 
-    public Point(double x, double y) {
-        this.x = x;
-        this.y = y;
+    private void drawColorKom(Graphics2D g2) {
+        draw(g2, new Color(75, 83, 32), new Color(218, 112, 214));
+    }
+
+    // ===== popup '?' แบบลอยค้าง ไม่มีกรอบ =====
+    private void drawQuestionMark(Graphics2D g2, Point2D head, double alpha, double timeSec) {
+        // 0→1 ใน ~0.4s แล้วค้าง
+        double t = Math.min(1.0, Math.max(0.0, (elapsedSec - 2.0) / 0.40));
+        t = t * t * (3 - 2 * t);
+        float a = (float) Math.max(alpha, t);
+        g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a));
+
+        double scale = 0.6 + 0.4 * t;
+        double baseX = head.getX() + 22;
+        double baseY = head.getY() - 28;
+
+        String q = "?";
+        float baseSize = 28f;
+        float size = (float) (baseSize * scale);
+        Font f = g2.getFont().deriveFont(Font.BOLD, size);
+
+        AffineTransform old = g2.getTransform();
+        g2.translate(baseX, baseY);
+        g2.scale(scale, scale);
+        g2.setColor(Color.BLACK);
+        g2.setFont(f);
+        g2.drawString(q, 0, 0);
+        g2.setTransform(old);
+
+        g2.setComposite(AlphaComposite.SrcOver);
     }
 }
