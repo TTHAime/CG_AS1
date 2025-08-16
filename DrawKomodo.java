@@ -12,7 +12,6 @@ import java.awt.geom.Area;
 import java.awt.geom.Path2D;
 import java.awt.geom.Point2D;
 import java.awt.geom.Rectangle2D;
-import java.awt.image.BufferedImage;
 import java.awt.Font;
 
 import javax.swing.JFrame;
@@ -22,17 +21,35 @@ import javax.swing.SwingUtilities;
 public class DrawKomodo extends JPanel implements Runnable {
     public static final int W = 600, H = 600;
 
+    // ===== Named constants =====
+    private static final double ZOOM_DELAY_SEC = 2.0;
+    private static final double ZOOM_DURATION_SEC = 0.8;
+    private static final double ZOOM_START = 1.0;
+    private static final double ZOOM_END = 3.0;
+
+    private static final float OUTLINE_STROKE_W = 0.8f;
+    private static final float MOUNTAIN_OUTLINE_W = 1.2f;
+    private static final float RIVER_STROKE_W = 50f;
+    private static final float RIVER_EDGE_W = 2f;
+
+    private static final int SKY_TOP_R = 210, SKY_TOP_G = 230, SKY_TOP_B = 255;
+    private static final int SKY_BOT_R = 170, SKY_BOT_G = 210, SKY_BOT_B = 250;
+
+    private static final double POPUP_FADE_IN = 0.40;
+    private static final float POPUP_FONT_SIZE = 28f;
+    private static final double POPUP_OFFSET_X = 22;
+    private static final double POPUP_OFFSET_Y = -28;
+
     // === Animation (threaded game loop) ===
     private volatile boolean running = true;
     private double elapsedSec = 0.0; // time since start (seconds)
 
     private Point2D eyeCenterPanel = new Point2D.Double(W * 0.58, H * 0.42);
 
-
     private Point2D zoomTarget = null;
     private double zoomOffsetX = 0, zoomOffsetY = 0;
 
-    // ======== Transform offsets (เดิมของรูป Komodo) ========
+    // ======== Transform offsets ========
     public static final double tx0 = 4.10999996856333, ty0 = 25.4699990461196;
     public static final double tx1 = 23.7599984020607, ty1 = 37.1581143299928;
     public static final double tx2 = 25.8693748021331, ty2 = 37.8731247103201;
@@ -55,6 +72,15 @@ public class DrawKomodo extends JPanel implements Runnable {
     public static final AffineTransform at8 = AffineTransform.getTranslateInstance(tx8, ty8);
     public static final AffineTransform at9 = AffineTransform.getTranslateInstance(tx9, ty9);
 
+    // ===== Reused objects  =====
+    private final BasicStroke outlineStroke = new BasicStroke(OUTLINE_STROKE_W);
+    private final BasicStroke mountainStroke = new BasicStroke(MOUNTAIN_OUTLINE_W);
+    private final BasicStroke riverStroke = new BasicStroke(RIVER_STROKE_W, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND);
+    private final BasicStroke riverEdgeStroke = new BasicStroke(RIVER_EDGE_W);
+    private final GradientPaint skyPaint = new GradientPaint(
+            0, 0, new Color(SKY_TOP_R, SKY_TOP_G, SKY_TOP_B),
+            0, H, new Color(SKY_BOT_R, SKY_BOT_G, SKY_BOT_B));
+
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             DrawKomodo panel = new DrawKomodo();
@@ -71,10 +97,11 @@ public class DrawKomodo extends JPanel implements Runnable {
 
     public DrawKomodo() {
         setPreferredSize(new Dimension(W, H));
-        setBackground(Color.WHITE); 
+        setBackground(Color.WHITE);
+        setDoubleBuffered(true); // ใช้ Swing double buffering แทนการสร้าง BufferedImage ทุกเฟรม
     }
 
-    // === API ควบคุมจุดซูม  ===
+    // === API ควบคุมจุดซูม ===
     public void setZoomTarget(double x, double y) {
         this.zoomTarget = new Point2D.Double(x, y);
     }
@@ -115,24 +142,22 @@ public class DrawKomodo extends JPanel implements Runnable {
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
 
-     
-        BufferedImage buffer = new BufferedImage(W, H, BufferedImage.TYPE_INT_ARGB);
-        Graphics2D g2 = buffer.createGraphics();
+        Graphics2D g2 = (Graphics2D) g.create();
 
         // quality
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
         g2.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
 
-
+        // SKY (screen space) — reused GradientPaint
         drawSkyScreenSpace(g2);
 
- 
+        // Zoom timing with constants
         double t = 0.0;
-        if (elapsedSec >= 2.0) {
-            t = Math.min(1.0, Math.max(0.0, (elapsedSec - 2.0) / 0.8)); // 0.8s เข้าเต็ม
+        if (elapsedSec >= ZOOM_DELAY_SEC) {
+            t = Math.min(1.0, Math.max(0.0, (elapsedSec - ZOOM_DELAY_SEC) / ZOOM_DURATION_SEC));
             t = t * t * (3 - 2 * t); // smoothstep
         }
-        double zoom = 1.0 + 2.0 * t; // 1x -> 3x
+        double zoom = ZOOM_START + (ZOOM_END - ZOOM_START) * t;
 
         Point2D target = (zoomTarget != null ? zoomTarget : eyeCenterPanel);
         double cx = (target != null ? target.getX() + zoomOffsetX : W / 2.0);
@@ -146,30 +171,30 @@ public class DrawKomodo extends JPanel implements Runnable {
         view.translate(W / 2.0, H / 2.0);
         view.scale(zoom, zoom);
         view.translate(-fx, -fy);
-        g2.transform(view);
 
-        // 3) WORLD (อยู่ใน world space): ภูเขา แม่น้ำ คอมโด
-        drawBackgroundWorld(g2); // ภูเขา+แม่น้ำ
-        drawColorKom(g2); // คอมโด
+        Graphics2D worldG = (Graphics2D) g2.create();
+        worldG.transform(view);
 
-        // 4) popup '?'
-        if (elapsedSec >= 2.0 && eyeCenterPanel != null) {
-            double appear = Math.min(1.0, Math.max(0.0, (elapsedSec - 2.0) / 0.40));
-            drawQuestionMark(g2, eyeCenterPanel, appear, elapsedSec);
+        // WORLD (อยู่ใน world space): ภูเขา แม่น้ำ คอมโด
+        drawBackgroundWorld(worldG); // ภูเขา+แม่น้ำ
+        drawColorKom(worldG); // คอมโด
+
+        // popup '?'
+        if (elapsedSec >= ZOOM_DELAY_SEC && eyeCenterPanel != null) {
+            double appear = Math.min(1.0, Math.max(0.0, (elapsedSec - ZOOM_DELAY_SEC) / POPUP_FADE_IN));
+            drawQuestionMark(worldG, eyeCenterPanel, appear, elapsedSec);
         }
 
+        worldG.dispose();
         g2.dispose();
-        g.drawImage(buffer, 0, 0, null);
     }
 
     // ---------- SKY ---------
     private void drawSkyScreenSpace(Graphics2D g2) {
         g2.setComposite(AlphaComposite.Src);
-        GradientPaint sky = new GradientPaint(
-                0, 0, new Color(210, 230, 255),
-                0, H, new Color(170, 210, 250));
-        g2.setPaint(sky);
+        g2.setPaint(skyPaint); // reused object
         g2.fillRect(0, 0, W, H);
+        g2.setComposite(AlphaComposite.SrcOver);
     }
 
     // ---------- ภูเขา+แม่น้ำ (world-space, โดนซูม) ----------
@@ -206,7 +231,7 @@ public class DrawKomodo extends JPanel implements Runnable {
         g2.setColor(new Color(90, 105, 120));
         g2.fill(m1);
         g2.setColor(new Color(60, 72, 84));
-        g2.setStroke(new BasicStroke(1.2f));
+        g2.setStroke(mountainStroke); // reused stroke
         g2.draw(m1);
 
         // Mountain range 2 (near)
@@ -257,13 +282,12 @@ public class DrawKomodo extends JPanel implements Runnable {
         riverCenter.append(rSeg1, false);
         riverCenter.append(rSeg2, true);
 
-        Shape river = new BasicStroke(50f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)
-                .createStrokedShape(riverCenter);
+        Shape river = riverStroke.createStrokedShape(riverCenter); // reused base stroke
 
         g2.setColor(new Color(90, 155, 210));
         g2.fill(river);
         g2.setColor(new Color(200, 230, 255, 140));
-        g2.setStroke(new BasicStroke(2f));
+        g2.setStroke(riverEdgeStroke); // reused edge stroke
         g2.draw(river);
     }
 
@@ -503,7 +527,7 @@ public class DrawKomodo extends JPanel implements Runnable {
         Shape shape8 = centerPanel.createTransformedShape(shape8Local);
         Shape shape9 = centerPanel.createTransformedShape(shape9Local);
 
-        g2.setStroke(new BasicStroke(0.8f));
+        g2.setStroke(outlineStroke); // reused outline stroke
 
         g2.setColor(c);
         g2.fill(shape0);
@@ -552,10 +576,6 @@ public class DrawKomodo extends JPanel implements Runnable {
         this.eyeCenterPanel = new Point2D.Double(eyeB.getCenterX(), eyeB.getCenterY());
     }
 
-    private void drawBlackKom(Graphics2D g2) {
-        draw(g2, Color.BLACK, Color.WHITE);
-    }
-
     private void drawColorKom(Graphics2D g2) {
         draw(g2, new Color(75, 83, 32), new Color(218, 112, 214));
     }
@@ -563,19 +583,17 @@ public class DrawKomodo extends JPanel implements Runnable {
     // ===== popup '?' แบบลอยค้าง ไม่มีกรอบ =====
     private void drawQuestionMark(Graphics2D g2, Point2D head, double alpha, double timeSec) {
         // 0→1 ใน ~0.4s แล้วค้าง
-        double t = Math.min(1.0, Math.max(0.0, (elapsedSec - 2.0) / 0.40));
+        double t = Math.min(1.0, Math.max(0.0, (elapsedSec - ZOOM_DELAY_SEC) / POPUP_FADE_IN));
         t = t * t * (3 - 2 * t);
         float a = (float) Math.max(alpha, t);
         g2.setComposite(AlphaComposite.getInstance(AlphaComposite.SRC_OVER, a));
 
         double scale = 0.6 + 0.4 * t;
-        double baseX = head.getX() + 22;
-        double baseY = head.getY() - 28;
+        double baseX = head.getX() + POPUP_OFFSET_X;
+        double baseY = head.getY() + POPUP_OFFSET_Y;
 
         String q = "?";
-        float baseSize = 28f;
-        float size = (float) (baseSize * scale);
-        Font f = g2.getFont().deriveFont(Font.BOLD, size);
+        Font f = g2.getFont().deriveFont(Font.BOLD, (float) (POPUP_FONT_SIZE * scale));
 
         AffineTransform old = g2.getTransform();
         g2.translate(baseX, baseY);
