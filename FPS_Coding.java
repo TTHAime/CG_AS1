@@ -46,9 +46,22 @@ public class FPS_Coding extends JPanel implements Runnable {
     private double phaseProg = 0.0;
 
     /* ========================= Layout ========================= */
-    private final Rectangle screen = new Rectangle(26, 22, W - 52, 240);
-    private final Rectangle desk = new Rectangle(20, 330, W - 40, 40);
-    private final Rectangle keyboard = new Rectangle(40, 380, W - 80, 170);
+    private static Polygon polyRect(int x, int y, int w, int h) {
+        Polygon p = new Polygon();
+        p.addPoint(x, y);
+        p.addPoint(x + w, y);
+        p.addPoint(x + w, y + h);
+        p.addPoint(x, y + h);
+        return p;
+    }
+
+    // Geometry for screen/desk/keyboard (use ints) + polygon shapes
+    private final int screenX = 26, screenY = 22, screenW = W - 52, screenH = 240;
+    private final Polygon screen = polyRect(screenX, screenY, screenW, screenH);
+    private final int deskX = 20, deskY = 330, deskW = W - 40, deskH = 40;
+    private final Polygon desk = polyRect(deskX, deskY, deskW, deskH);
+    private final int keyboardX = 40, keyboardY = 380, keyboardW = W - 80, keyboardH = 170;
+    private final Polygon keyboard = polyRect(keyboardX, keyboardY, keyboardW, keyboardH);
 
     /* ========================= Keyboard grid ========================= */
     private final int cols = 14, rows = 5;
@@ -241,8 +254,8 @@ public class FPS_Coding extends JPanel implements Runnable {
         leftHand.update(dt, t);
         rightHand.update(dt, t);
 
-        float contentLeft = screen.x + codePadding;
-        float contentRight = screen.x + screen.width - codePadding;
+        float contentLeft = screenX + codePadding;
+        float contentRight = screenX + screenW - codePadding;
         for (CodeLine cl : codeLines) {
             cl.x -= cl.speed * dt * (float) speedMul;
             if (cl.x + cl.width < contentLeft)
@@ -258,16 +271,16 @@ public class FPS_Coding extends JPanel implements Runnable {
 
     /* ========================= Keyboard build ========================= */
     private void buildKeyboard() {
-        keyW = (keyboard.width - pad * (cols + 1)) / cols;
-        keyH = (keyboard.height - pad * (rows + 1)) / rows;
+        keyW = (keyboardW - pad * (cols + 1)) / cols;
+        keyH = (keyboardH - pad * (rows + 1)) / rows;
         keys = new KeyCell[rows][cols];
 
         for (int r = 0; r < rows; r++) {
             double offset = stagger(r) * (keyW + pad);
             for (int c = 0; c < cols; c++) {
-                int x = keyboard.x + pad + (int) (c * (keyW + pad) + offset);
-                int y = keyboard.y + pad + r * (keyH + pad);
-                boolean in = (x + keyW <= keyboard.x + keyboard.width - pad);
+                int x = keyboardX + pad + (int) (c * (keyW + pad) + offset);
+                int y = keyboardY + pad + r * (keyH + pad);
+                boolean in = (x + keyW <= keyboardX + keyboardW - pad);
 
                 keys[r][c] = new KeyCell();
                 keys[r][c].x = x;
@@ -292,7 +305,7 @@ public class FPS_Coding extends JPanel implements Runnable {
 
     private Point getKeyCenter(int r, int c) {
         if (r < 0 || r >= rows || c < 0 || c >= cols || !keys[r][c].exists)
-            return new Point(keyboard.x, keyboard.y);
+            return new Point(keyboardX, keyboardY);
         KeyCell k = keys[r][c];
         return new Point(k.x + k.w / 2, k.y + k.h / 2);
     }
@@ -332,8 +345,8 @@ public class FPS_Coding extends JPanel implements Runnable {
                 "Animation"
         };
 
-        int top = screen.y + codePadding + 8;
-        int bottom = screen.y + screen.height - codePadding - 8;
+        int top = screenY + codePadding + 8;
+        int bottom = screenY + screenH - codePadding - 8;
         int gap = 22, y = top;
 
         for (int i = 0; i < lines.length && y < bottom; i++, y += gap) {
@@ -349,7 +362,7 @@ public class FPS_Coding extends JPanel implements Runnable {
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
         double pivotX = W / 2.0;
-        double pivotY = desk.y + desk.height / 2.0;
+        double pivotY = deskY + deskH / 2.0;
 
         g2.translate(pivotX, pivotY);
         g2.scale(camScale, camScale);
@@ -370,7 +383,7 @@ public class FPS_Coding extends JPanel implements Runnable {
 
         // โต๊ะ
         g2.setColor(new Color(194, 180, 160));
-        fillRoundRectPoly(g2, desk.x, desk.y, desk.width, desk.height, 14, 8);
+        fillRoundRectPoly(g2, deskX, deskY, deskW, deskH, 14, 8);
 
         // จอ + โค้ด
         drawMonitor(g2);
@@ -406,23 +419,23 @@ public class FPS_Coding extends JPanel implements Runnable {
     }
 
     private void drawMonitor(Graphics2D g2) {
-        int mx = screen.x + screen.width / 2;
-        int top = screen.y + screen.height;
-        int gap = 10, postW = 28, postH = Math.max(18, (desk.y - (top + gap)) - 14);
+        int mx = screenX + screenW / 2;
+        int top = screenY + screenH;
+        int gap = 10, postW = 28, postH = Math.max(18, (deskY - (top + gap)) - 14);
 
         // เสา/ฐานจอ
         g2.setColor(new Color(85, 90, 110));
         fillRoundRectPoly(g2, mx - postW / 2, top + gap, postW, postH, 10, 8);
-        int baseW = 160, baseH = 14, baseY = desk.y - baseH - 4;
+        int baseW = 160, baseH = 14, baseY = deskY - baseH - 4;
         fillRoundRectPoly(g2, mx - baseW / 2, baseY, baseW, baseH, 10, 8);
 
         // เงาฐานจอ (วงรี)
         g2.setColor(new Color(0, 0, 0, 40));
-        fillEllipsePoly(g2, mx, desk.y - 0, (int) (baseW * 0.45), 6, 36);
+        fillEllipsePoly(g2, mx, deskY - 0, (int) (baseW * 0.45), 6, 36);
 
         // กรอบจอ
         g2.setColor(new Color(58, 62, 78));
-        fillRoundRectPoly(g2, screen.x - 6, screen.y - 6, screen.width + 12, screen.height + 12, 16, 12);
+        fillRoundRectPoly(g2, screenX - 6, screenY - 6, screenW + 12, screenH + 12, 16, 12);
 
         double dim = switch (state) {
             case CODING -> 1.0;
@@ -437,23 +450,23 @@ public class FPS_Coding extends JPanel implements Runnable {
 
         // พื้นจอ
         g2.setColor(screenBg);
-        fillRoundRectPoly(g2, screen.x, screen.y, screen.width, screen.height, 12, 12);
+        fillRoundRectPoly(g2, screenX, screenY, screenW, screenH, 12, 12);
 
         // glow ด้านใน
         g2.setColor(screenGlow);
-        fillRoundRectPoly(g2, screen.x + 6, screen.y + 6, screen.width - 12, screen.height - 12, 10, 12);
+        fillRoundRectPoly(g2, screenX + 6, screenY + 6, screenW - 12, screenH - 12, 10, 12);
 
         boolean showCode = (state == Scene.CODING) || (state == Scene.DIMMING);
         if (showCode) {
             Shape oldClip = g2.getClip();
-            Polygon contentClip = roundRectPolygon(screen.x + codePadding, screen.y + codePadding,
-                    screen.width - 2 * codePadding, screen.height - 2 * codePadding, 8, 10);
+            Polygon contentClip = roundRectPolygon(screenX + codePadding, screenY + codePadding,
+                    screenW - 2 * codePadding, screenH - 2 * codePadding, 8, 10);
             g2.setClip(contentClip);
 
             g2.setFont(codeFont);
             g2.setColor(new Color(180, 230, 255));
             FontMetrics fm = g2.getFontMetrics();
-            float contentRight = screen.x + screen.width - codePadding;
+            float contentRight = screenX + screenW - codePadding;
 
             for (CodeLine cl : codeLines) {
                 if (cl.width == 0) {
@@ -469,7 +482,7 @@ public class FPS_Coding extends JPanel implements Runnable {
     private void drawKeyboard(Graphics2D g2) {
         // ฐานคีย์บอร์ด
         g2.setColor(new Color(72, 78, 95));
-        fillRoundRectPoly(g2, keyboard.x, keyboard.y, keyboard.width, keyboard.height, 18, 12);
+        fillRoundRectPoly(g2, keyboardX, keyboardY, keyboardW, keyboardH, 18, 12);
 
         // ปุ่มทั้งหมด
         for (int r = 0; r < rows; r++) {
