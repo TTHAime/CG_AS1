@@ -32,9 +32,8 @@ import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
 import javax.swing.JComponent;
-import javax.swing.Timer;
 
-public class Animation_t1 {
+public class Assignment1_66050176_66050356 {
 
     // === Scene durations (milliseconds) ===
     private static final int DUR_FPS_MS = 10000; // 10 s
@@ -55,8 +54,8 @@ public class Animation_t1 {
     private Component ballPanel;
     private Component komodoPanel;
 
-    public Animation_t1() {
-        frame = new JFrame("One Window • Scene Sequencer (FPS → Ball → Komodo)");
+    public Assignment1_66050176_66050356() {
+        frame = new JFrame("Assignment1_66050176_66050356");
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         cards = new CardLayout();
@@ -138,7 +137,7 @@ public class Animation_t1 {
 
     // === main ===
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(Animation_t1::new);
+        SwingUtilities.invokeLater(Assignment1_66050176_66050356::new);
     }
 }
 
