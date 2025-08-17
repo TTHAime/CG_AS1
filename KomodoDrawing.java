@@ -1,5 +1,6 @@
 import javax.swing.*;
 import java.awt.*;
+import java.awt.geom.AffineTransform;
 import java.awt.image.BufferedImage;
 import java.util.LinkedList;
 import java.util.Queue;
@@ -36,8 +37,6 @@ public class KomodoDrawing extends JPanel {
 
     @Override
     protected void paintComponent(Graphics g) {
-        super.paintComponent(g);
-
         // Clear background in buffer (floodFill will use backgroundColor as target color)
         fillBuffer(backgroundColor.getRGB());
 
@@ -66,8 +65,8 @@ public class KomodoDrawing extends JPanel {
                 {306,387, 262,384, 225,381, 194,378},
                 {194,378, 162,376, 138,376, 125,373}
         };
-        for (int[] c : top)  strokeCubicBezier(g,c, 180);
-        for (int[] c : bot)  strokeCubicBezier(g,c, 180);
+        for (int[] c : top)  drawCubicBezier(g,c, 180);
+        for (int[] c : bot)  drawCubicBezier(g,c, 180);
         bresenhamLine(g,112,369, 125,373); // close the snout gap
 
         //  Head details 
@@ -134,8 +133,8 @@ public class KomodoDrawing extends JPanel {
 
         // Tail stripes 
         useColor(g,outline);
-        strokeCubicBezier(g,new int[]{450,381, 459,378, 469,382, 478,380}, 60);
-        strokeCubicBezier(g,new int[]{462,386, 472,383, 481,387, 492,384}, 60);
+        drawCubicBezier(g,new int[]{450,381, 459,378, 469,382, 478,380}, 60);
+        drawCubicBezier(g,new int[]{462,386, 472,383, 481,387, 492,384}, 60);
 
         //Present buffer
         g.drawImage(buf, 0, 0, null);
@@ -196,7 +195,7 @@ public class KomodoDrawing extends JPanel {
     }
 
     // Stroke a Bezier by connecting sampled points with Bresenham
-    private void strokeCubicBezier(Graphics g,int[] c, int steps) {
+    private void drawCubicBezier(Graphics g,int[] c, int steps) {
         Point[] cps = new Point[]{
                 new Point(c[0],c[1]), new Point(c[2],c[3]),
                 new Point(c[4],c[5]), new Point(c[6],c[7])
